@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Contracts\LoginResponse;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -31,6 +32,37 @@ class FortifyServiceProvider extends ServiceProvider
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
+          Fortify::authenticateUsing(function ($request) {
+        $user = \App\Models\User::where('email', $request->email)->first();
+
+        if (
+            $user &&
+            \Hash::check($request->password, $user->password)
+        ) {
+            auth()->login($user);
+
+            return $user;
+        }
+
+        return null;
+    });
+  $this->app->singleton(LoginResponse::class, function () {
+    return new class implements LoginResponse {
+        public function toResponse($request)
+        {
+            $user = auth()->user();
+
+            return redirect()->intended(
+                match ($user->role) {
+                    'admin'   => '/admin/dashboard',
+                    'teacher' => '/teacher/dashboard',
+                    default   => '/dashboard',
+                }
+            );
+        }
+    };
+});
+
     }
 
     /**
